@@ -157,7 +157,8 @@ export const generateBillPdf = async (billData: BillData, size: PrintSize): Prom
     } as any);
   } else {
     // Local Development
-    const puppeteer = await import('puppeteer');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const puppeteer = require('puppeteer');
     browser = await puppeteer.default.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
