@@ -1,20 +1,21 @@
-import puppeteer from 'puppeteer';
+import chromium from '@sparticuz/chromium';
+import puppeteerCore from 'puppeteer-core';
 import { Bill, BillItem, Customer, Store, User } from '@prisma/client';
 
 interface BillData extends Bill {
-    billItems: BillItem[];
-    customer: Customer | null;
-    store: Store;
-    biller?: User | null;
+  billItems: BillItem[];
+  customer: Customer | null;
+  store: Store;
+  biller?: User | null;
 }
 
 type PrintSize = '58mm' | '80mm'; // 90mm usually refers to 80mm standard or similar. I'll support 80mm/90mm via wide layout.
 
 const generateBillHtml = (bill: BillData, size: PrintSize): string => {
-    const width = size === '58mm' ? '58mm' : '80mm';
-    const fontSize = size === '58mm' ? '12px' : '14px';
+  const width = size === '58mm' ? '58mm' : '80mm';
+  const fontSize = size === '58mm' ? '12px' : '14px';
 
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -141,37 +142,52 @@ const generateBillHtml = (bill: BillData, size: PrintSize): string => {
  * Generate PDF buffer for bill
  */
 export const generateBillPdf = async (billData: BillData, size: PrintSize): Promise<Buffer> => {
-    const html = generateBillHtml(billData, size);
+  const html = generateBillHtml(billData, size);
+  let browser;
 
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION) {
+    // Production (Vercel/AWS Lambda)
+    const chromiumAny = chromium as any;
+    browser = await puppeteerCore.launch({
+      args: chromiumAny.args,
+      defaultViewport: chromiumAny.defaultViewport,
+      executablePath: await chromiumAny.executablePath(),
+      headless: chromiumAny.headless === 'new' ? true : chromiumAny.headless,
+      ignoreHTTPSErrors: true,
+    } as any);
+  } else {
+    // Local Development
+    const puppeteer = await import('puppeteer');
+    browser = await puppeteer.default.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
+  }
 
+  try {
     const page = await browser.newPage();
-
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
-    // Set PDF options based on thermal printer needs
-    // width IS controlled by @page usually, but we set it here too
     const pdfBuffer = await page.pdf({
-        width: size === '58mm' ? '58mm' : '80mm',
-        printBackground: true,
-        height: 'auto', // Continuous roll usually, but Puppeteer might need explicit sizing or auto
-        margin: {
-            top: '0px',
-            right: '0px',
-            bottom: '0px',
-            left: '0px'
-        }
+      width: size === '58mm' ? '58mm' : '80mm',
+      printBackground: true,
+      height: 'auto',
+      margin: {
+        top: '0px',
+        right: '0px',
+        bottom: '0px',
+        left: '0px'
+      }
     });
 
-    await browser.close();
-
-    // Return Uint8Array as Buffer
     return Buffer.from(pdfBuffer);
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
 };
 
 export default {
-    generateBillPdf,
+  generateBillPdf,
 };
