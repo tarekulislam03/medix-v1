@@ -1,5 +1,5 @@
 import prisma from '../config/database';
-import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
+import { SubscriptionPlan, SubscriptionStatus, Prisma, Subscription } from '@prisma/client';
 
 // ============================================
 // PLAN CONFIGURATION
@@ -263,7 +263,7 @@ export const changePlan = async (
     endDate.setDate(endDate.getDate() + durationDays);
 
     // Create new subscription (deactivate old ones)
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         // Mark all existing subscriptions as cancelled
         await tx.subscription.updateMany({
             where: {
@@ -450,7 +450,7 @@ export const getSubscriptionHistory = async (storeId: string) => {
         orderBy: { createdAt: 'desc' },
     });
 
-    return subscriptions.map((sub) => ({
+    return subscriptions.map((sub: Subscription) => ({
         id: sub.id,
         plan: sub.plan,
         status: sub.status,
