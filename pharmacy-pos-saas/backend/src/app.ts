@@ -41,6 +41,16 @@ if (process.env.NODE_ENV === 'development') {
     });
 }
 
+// Root endpoint
+app.get('/', (req: Request, res: Response) => {
+    res.status(200).json({
+        message: 'Welcome to Pharmacy POS API',
+        version: '1.0.0',
+        documentation: '/api-docs', // If you have docs later
+        status: 'online'
+    });
+});
+
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
     res.status(200).json({
